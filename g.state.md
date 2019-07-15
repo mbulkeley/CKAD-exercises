@@ -157,7 +157,7 @@ kubectl get pv # will show as 'Bound' as well
 </p>
 </details>
 
-### Create a busybox pod with command 'sleep 3600', save it on pod.yaml. Mount the PersistentVolumeClaim to '/etc/foo'. Connect to the 'busybox' pod, and copy the '/etc/passwd' file to '/etc/foo'
+### Create a busybox pod with command 'sleep 3600', save it on pod.yaml. Mount the PersistentVolumeClaim to '/etc/foo'. Connect to the 'busybox' pod, and copy the '/etc/passwd' file to '/etc/foo/passwd'
 
 <details><summary>show</summary>
 <p>
@@ -225,7 +225,7 @@ Create the second pod, called busybox2:
 
 ```bash
 vim pod.yaml
-# change 'name: busybox' to 'name: busybox2'
+# change 'metadata.name: busybox' to 'metadata.name: busybox2'
 kubectl create -f pod.yaml
 kubectl exec busybox2 -- ls /etc/foo # will show 'passwd'
 # cleanup
@@ -242,7 +242,8 @@ kubectl delete po busybox busybox2
 
 ```bash
 kubectl run busybox --image=busybox --restart=Never -- sleep 3600
-kubectl cp busybox:/etc/passwd . # kubectl cp command
+kubectl cp busybox:/etc/passwd ./passwd # kubectl cp command
+# previous command might report an error, feel free to ignore it since copy command works
 cat passwd
 ```
 
