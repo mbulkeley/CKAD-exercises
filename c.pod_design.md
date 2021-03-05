@@ -2,6 +2,7 @@
 # Pod design (20%)
 
 ## Labels and annotations
+kubernetes.io > Documentation > Concepts > Overview > [Labels and Selectors](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors)
 
 ### Create 3 pods with names nginx1,nginx2,nginx3. All of them should have the label app=v1
 
@@ -41,13 +42,15 @@ kubectl label po nginx2 app=v2 --overwrite
 </p>
 </details>
 
-### Get the label 'app' for the pods
+### Get the label 'app' for the pods (show a column with APP labels)
 
 <details><summary>show</summary>
 <p>
 
 ```bash
 kubectl get po -L app
+# or
+kubectl get po --label-columns=app
 ```
 
 </p>
@@ -62,6 +65,8 @@ kubectl get po -L app
 kubectl get po -l app=v2
 # or
 kubectl get po -l 'app in (v2)'
+# or
+kubectl get po --selector=app=v2
 ```
 
 </p>
@@ -77,7 +82,7 @@ kubectl label po nginx1 nginx2 nginx3 app-
 # or
 kubectl label po nginx{1..3} app-
 # or
-kubectl label po -lapp app-
+kubectl label po -l app app-
 ```
 
 </p>
@@ -87,6 +92,13 @@ kubectl label po -lapp app-
 
 <details><summary>show</summary>
 <p>
+
+Add the label to a node:
+
+```bash
+kubectl label nodes <your-node-name> accelerator=nvidia-tesla-p100
+kubectl get nodes --show-labels
+```
 
 We can use the 'nodeSelector' property on the Pod YAML:
 
@@ -100,13 +112,35 @@ spec:
     - name: cuda-test
       image: "k8s.gcr.io/cuda-vector-add:v0.1"
   nodeSelector: # add this
-    accelerator: nvidia-tesla-p100 # the slection label
+    accelerator: nvidia-tesla-p100 # the selection label
 ```
 
 You can easily find out where in the YAML it should be placed by:
 
 ```bash
 kubectl explain po.spec
+```
+
+OR:
+Use node affinity (https://kubernetes.io/docs/tasks/configure-pod-container/assign-pods-nodes-using-node-affinity/#schedule-a-pod-using-required-node-affinity)
+
+```YAML
+apiVersion: v1
+kind: Pod
+metadata:
+  name: affinity-pod
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: accelerator
+            operator: In
+            values:
+            - nvidia-tesla-p100
+  containers:
+    ...
 ```
 
 </p>
@@ -120,6 +154,10 @@ kubectl explain po.spec
 
 ```bash
 kubectl annotate po nginx1 nginx2 nginx3 description='my description'
+
+#or
+
+kubectl annotate po nginx{1..3} description='my description'
 ```
 
 </p>
@@ -132,9 +170,13 @@ kubectl annotate po nginx1 nginx2 nginx3 description='my description'
 
 ```bash
 kubectl describe po nginx1 | grep -i 'annotations'
+
+# or
+
+kubectl get po nginx1 -o custom-columns=Name:metadata.name,ANNOTATIONS:metadata.annotations.description
 ```
 
-As an alternative to using `| grep` you can use jsonPath like `-o jsonpath='{.metadata.annotations}{"\n"}'`
+As an alternative to using `| grep` you can use jsonPath like `kubectl get po nginx1 -o jsonpath='{.metadata.annotations}{"\n"}'`
 
 </p>
 </details>
@@ -173,13 +215,7 @@ kubernetes.io > Documentation > Concepts > Workloads > Controllers > [Deployment
 <p>
 
 ```bash
-kubectl run nginx --image=nginx:1.7.8 --replicas=2 --port=80
-```
-
-**However**, `kubectl run` for Deployments is Deprecated and will be removed in a future version. What you can do is:
-
-```bash
-kubectl create deployment nginx  --image=nginx:1.7.8  --dry-run -o yaml > deploy.yaml
+kubectl create deployment nginx  --image=nginx:1.7.8  --dry-run=client -o yaml > deploy.yaml
 vi deploy.yaml
 # change the replicas field from 1 to 2
 # add this section to the container spec and save the deploy.yaml file
@@ -191,7 +227,12 @@ kubectl apply -f deploy.yaml
 or, do something like:
 
 ```bash
-kubectl create deployment nginx  --image=nginx:1.7.8  --dry-run -o yaml | sed 's/replicas: 1/replicas: 2/g'  | sed 's/image: nginx:1.7.8/image: nginx:1.7.8\n        ports:\n        - containerPort: 80/g' | kubectl apply -f -
+kubectl create deployment nginx  --image=nginx:1.7.8  --dry-run=client -o yaml | sed 's/replicas: 1/replicas: 2/g'  | sed 's/image: nginx:1.7.8/image: nginx:1.7.8\n        ports:\n        - containerPort: 80/g' | kubectl apply -f -
+```
+
+or, 
+```bash
+kubectl create deploy nginx --image=nginx:1.7.8 --replicas=2 --port=80
 ```
 
 </p>
@@ -203,7 +244,7 @@ kubectl create deployment nginx  --image=nginx:1.7.8  --dry-run -o yaml | sed 's
 <p>
 
 ```bash
-kubectl get deploy nginx --export -o yaml
+kubectl get deploy nginx -o yaml
 ```
 
 </p>
@@ -220,7 +261,7 @@ kubectl describe deploy nginx # you'll see the name of the replica set on the Ev
 kubectl get rs -l run=nginx # if you created deployment by 'run' command
 kubectl get rs -l app=nginx # if you created deployment by 'create' command
 # you could also just do kubectl get rs
-kubectl get rs nginx-7bf7478b77 --export -o yaml
+kubectl get rs nginx-7bf7478b77 -o yaml
 ```
 
 </p>
@@ -236,7 +277,7 @@ kubectl get po # get all the pods
 # OR you can find pods directly by:
 kubectl get po -l run=nginx # if you created deployment by 'run' command
 kubectl get po -l app=nginx # if you created deployment by 'create' command
-kubectl get po nginx-7bf7478b77-gjzp8 -o yaml --export
+kubectl get po nginx-7bf7478b77-gjzp8 -o yaml
 ```
 
 </p>
@@ -345,13 +386,13 @@ kubectl rollout status deploy nginx # Everything should be OK
 </p>
 </details>
 
-### Check the details of the third revision (number 3)
+### Check the details of the fourth revision (number 4)
 
 <details><summary>show</summary>
 <p>
 
 ```bash
-kubectl rollout history deploy nginx --revision=3 # You'll also see the wrong image displayed here
+kubectl rollout history deploy nginx --revision=4 # You'll also see the wrong image displayed here
 ```
 
 </p>
@@ -433,23 +474,19 @@ kubectl rollout history deploy nginx --revision=6 # insert the number of your la
 ```bash
 kubectl delete deploy nginx
 kubectl delete hpa nginx
-```
 
+#Or
+kubectl delete deploy/nginx hpa/nginx
+```
 </p>
 </details>
 
 ## Jobs
 
-### Create a job with image perl that runs default command with arguments "perl -Mbignum=bpi -wle 'print bpi(2000)'"
+### Create a job named pi with image perl that runs the command with arguments "perl -Mbignum=bpi -wle 'print bpi(2000)'"
 
 <details><summary>show</summary>
 <p>
-
-```bash
-kubectl run pi --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'
-```
-
-**However**, `kubectl run` for Job is Deprecated and will be removed in a future version. What you can do is:
 
 ```bash
 kubectl create job pi  --image=perl -- perl -Mbignum=bpi -wle 'print bpi(2000)'
@@ -469,6 +506,13 @@ kubectl get po # get the pod name
 kubectl logs pi-**** # get the pi numbers
 kubectl delete job pi
 ```
+OR 
+
+```bash
+kubectl get jobs -w # wait till 'SUCCESSFUL' is 1 (will take some time, perl image might be big)
+kubectl logs job/pi
+kubectl delete job pi
+```
 
 </p>
 </details>
@@ -477,12 +521,6 @@ kubectl delete job pi
 
 <details><summary>show</summary>
 <p>
-
-```bash
-kubectl run busybox --image=busybox --restart=OnFailure -- /bin/sh -c 'echo hello;sleep 30;echo world'
-```
-
-**However**, `kubectl run` for Job is Deprecated and will be removed in a future version. What you can do is:
 
 ```bash
 kubectl create job busybox --image=busybox -- /bin/sh -c 'echo hello;sleep 30;echo world'
@@ -530,13 +568,55 @@ kubectl delete job busybox
 </p>
 </details>
 
+### Create a job but ensure that it will be automatically terminated by kubernetes if it takes more than 30 seconds to execute
+
+<details><summary>show</summary>
+<p>
+  
+```bash
+kubectl create job busybox --image=busybox --dry-run=client -o yaml -- /bin/sh -c 'while true; do echo hello; sleep 10;done' > job.yaml
+vi job.yaml
+```
+  
+Add job.spec.activeDeadlineSeconds=30
+
+```bash
+apiVersion: batch/v1
+kind: Job
+metadata:
+  creationTimestamp: null
+  labels:
+    run: busybox
+  name: busybox
+spec:
+  activeDeadlineSeconds: 30 # add this line
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: busybox
+    spec:
+      containers:
+      - args:
+        - /bin/sh
+        - -c
+        - while true; do echo hello; sleep 10;done
+        image: busybox
+        name: busybox
+        resources: {}
+      restartPolicy: OnFailure
+status: {}
+```
+</p>
+</details>
+
 ### Create the same job, make it run 5 times, one after the other. Verify its status and delete it
 
 <details><summary>show</summary>
 <p>
 
 ```bash
-kubectl create job busybox --image=busybox --dry-run -o yaml -- /bin/sh -c 'echo hello;sleep 30;echo world' > job.yaml
+kubectl create job busybox --image=busybox --dry-run=client -o yaml -- /bin/sh -c 'echo hello;sleep 30;echo world' > job.yaml
 vi job.yaml
 ```
 
@@ -647,12 +727,6 @@ kubernetes.io > Documentation > Tasks > Run Jobs > [Running Automated Tasks with
 <p>
 
 ```bash
-kubectl run busybox --image=busybox --restart=OnFailure --schedule="*/1 * * * *" -- /bin/sh -c 'date; echo Hello from the Kubernetes cluster'
-```
-
-**However**, `kubectl run` for CronJob is Deprecated and will be removed in a future version. What you can do is:
-
-```bash
 kubectl create cronjob busybox --image=busybox --schedule="*/1 * * * *" -- /bin/sh -c 'date; echo Hello from the Kubernetes cluster'
 ```
 
@@ -671,6 +745,50 @@ kubectl get po --show-labels # observe that the pods have a label that mentions 
 kubectl logs busybox-1529745840-m867r
 # Bear in mind that Kubernetes will run a new job/pod for each new cron job
 kubectl delete cj busybox
+```
+
+</p>
+</details>
+
+### Create a cron job with image busybox that runs every minute and writes 'date; echo Hello from the Kubernetes cluster' to standard output. The cron job should be terminated if it takes more than 17 seconds to start execution after its schedule.
+
+<details><summary>show</summary>
+<p>
+
+```bash
+kubectl create cronjob time-limited-job --image=busybox --restart=Never --dry-run=client --schedule="* * * * *" -o yaml -- /bin/sh -c 'date; echo Hello from the Kubernetes cluster' > time-limited-job.yaml
+vi time-limited-job.yaml
+```
+Add cronjob.spec.jobTemplate.spec.activeDeadlineSeconds=17
+
+```bash
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  creationTimestamp: null
+  name: time-limited-job
+spec:
+  jobTemplate:
+    metadata:
+      creationTimestamp: null
+      name: time-limited-job
+    spec:
+      activeDeadlineSeconds: 17 # add this line
+      template:
+        metadata:
+          creationTimestamp: null
+        spec:
+          containers:
+          - args:
+            - /bin/sh
+            - -c
+            - date; echo Hello from the Kubernetes cluster
+            image: busybox
+            name: time-limited-job
+            resources: {}
+          restartPolicy: Never
+  schedule: '* * * * *'
+status: {}
 ```
 
 </p>

@@ -32,7 +32,7 @@ kubectl run nginx --image=nginx --restart=Never -n mynamespace
 Easily generate YAML with:
 
 ```bash
-kubectl run nginx --image=nginx --restart=Never --dry-run -o yaml > pod.yaml
+kubectl run nginx --image=nginx --restart=Never --dry-run=client -n mynamespace -o yaml > pod.yaml
 ```
 
 ```bash
@@ -47,6 +47,7 @@ metadata:
   labels:
     run: nginx
   name: nginx
+  namespace: mynamespace
 spec:
   containers:
   - image: nginx
@@ -59,13 +60,13 @@ status: {}
 ```
 
 ```bash
-kubectl create -f pod.yaml -n mynamespace
+kubectl create -f pod.yaml
 ```
 
 Alternatively, you can run in one line
 
 ```bash
-kubectl run nginx --image=nginx --restart=Never --dry-run -o yaml | kubectl create -n mynamespace -f -
+kubectl run nginx --image=nginx --restart=Never --dry-run=client -o yaml | kubectl create -n mynamespace -f -
 ```
 
 </p>
@@ -94,7 +95,7 @@ kubectl logs busybox
 
 ```bash
 # create a  YAML template with this command
-kubectl run busybox --image=busybox --restart=Never --dry-run -o yaml --command  -- env > envpod.yaml
+kubectl run busybox --image=busybox --restart=Never --dry-run=client -o yaml --command -- env > envpod.yaml
 # see it
 cat envpod.yaml
 ```
@@ -134,19 +135,19 @@ kubectl logs busybox
 <p>
 
 ```bash
-kubectl create namespace myns -o yaml --dry-run
+kubectl create namespace myns -o yaml --dry-run=client
 ```
 
 </p>
 </details>
 
-### Get the YAML for a new ResourceQuota called 'myrq' without creating it
+### Get the YAML for a new ResourceQuota called 'myrq' with hard limits of 1 CPU, 1G memory and 2 pods without creating it
 
 <details><summary>show</summary>
 <p>
 
 ```bash
-kubectl create quota myrq --hard=cpu=1,memory=1G,pods=2 --dry-run -o yaml
+kubectl create quota myrq --hard=cpu=1,memory=1G,pods=2 --dry-run=client -o yaml
 ```
 
 </p>
@@ -160,11 +161,15 @@ kubectl create quota myrq --hard=cpu=1,memory=1G,pods=2 --dry-run -o yaml
 ```bash
 kubectl get po --all-namespaces
 ```
+Alternatively 
 
+```bash
+kubectl get po -A
+```
 </p>
 </details>
 
-### Create a pod with image nginx called nginx and allow traffic on port 80
+### Create a pod with image nginx called nginx and expose traffic on port 80
 
 <details><summary>show</summary>
 <p>
@@ -176,10 +181,12 @@ kubectl run nginx --image=nginx --restart=Never --port=80
 </p>
 </details>
 
-### Change pod's image to nginx:1.7.1. Observe that the pod will be killed and recreated as soon as the image gets pulled
+### Change pod's image to nginx:1.7.1. Observe that the container will be restarted as soon as the image gets pulled
 
 <details><summary>show</summary>
 <p>
+
+*Note*: The `RESTARTS` column should contain 0 initially (ideally - it could be any number)
 
 ```bash
 # kubectl set image POD/POD_NAME CONTAINER_NAME=IMAGE_NAME:TAG
@@ -187,6 +194,21 @@ kubectl set image pod/nginx nginx=nginx:1.7.1
 kubectl describe po nginx # you will see an event 'Container will be killed and recreated'
 kubectl get po nginx -w # watch it
 ```
+
+*Note*: some time after changing the image, you should see that the value in the `RESTARTS` column has been increased by 1, because the container has been restarted, as stated in the events shown at the bottom of the `kubectl describe pod` command:
+
+```
+Events:
+  Type    Reason     Age                  From               Message
+  ----    ------     ----                 ----               -------
+[...]
+  Normal  Killing    100s                 kubelet, node3     Container pod1 definition changed, will be restarted
+  Normal  Pulling    100s                 kubelet, node3     Pulling image "nginx:1.7.1"
+  Normal  Pulled     41s                  kubelet, node3     Successfully pulled image "nginx:1.7.1"
+  Normal  Created    36s (x2 over 9m43s)  kubelet, node3     Created container pod1
+  Normal  Started    36s (x2 over 9m43s)  kubelet, node3     Started container pod1
+```
+
 *Note*: you can check pod's image by running
 
 ```bash
@@ -196,7 +218,7 @@ kubectl get po nginx -o jsonpath='{.spec.containers[].image}{"\n"}'
 </p>
 </details>
 
-### Get the pod's ip, use a temp busybox image to wget its '/'
+### Get nginx pod's ip created in previous step, use a temp busybox image to wget its '/'
 
 <details><summary>show</summary>
 <p>
@@ -204,10 +226,7 @@ kubectl get po nginx -o jsonpath='{.spec.containers[].image}{"\n"}'
 ```bash
 kubectl get po -o wide # get the IP, will be something like '10.1.1.131'
 # create a temp busybox pod
-kubectl run busybox --image=busybox --rm -it --restart=Never -- sh
-# run wget on specified IP:Port
-wget -O- 10.1.1.131:80
-exit
+kubectl run busybox --image=busybox --rm -it --restart=Never -- wget -O- 10.1.1.131:80
 ```
 
 Alternatively you can also try a more advanced option:
@@ -216,22 +235,31 @@ Alternatively you can also try a more advanced option:
 # Get IP of the nginx pod
 NGINX_IP=$(kubectl get pod nginx -o jsonpath='{.status.podIP}')
 # create a temp busybox pod
-kubectl run busybox --image=busybox --env="NGINX_IP=$NGINX_IP" --rm -it --restart=Never -- sh
-# run wget on specified IP:Port
-wget -O- $NGINX_IP:80
-exit
+kubectl run busybox --image=busybox --env="NGINX_IP=$NGINX_IP" --rm -it --restart=Never -- sh -c 'wget -O- $NGINX_IP:80'
 ``` 
+
+Or just in one line:
+
+```bash
+kubectl run busybox --image=busybox --rm -it --restart=Never -- wget -O- $(kubectl get pod nginx -o jsonpath='{.status.podIP}:{.spec.containers[0].ports[0].containerPort}')
+```
 
 </p>
 </details>
 
-### Get this pod's YAML without cluster specific information
+### Get pod's YAML
 
 <details><summary>show</summary>
 <p>
 
 ```bash
-kubectl get po nginx -o yaml --export
+kubectl get po nginx -o yaml
+# or
+kubectl get po nginx -oyaml
+# or
+kubectl get po nginx --output yaml
+# or
+kubectl get po nginx --output=yaml
 ```
 
 </p>
@@ -273,7 +301,7 @@ kubectl logs nginx -p
 </p>
 </details>
 
-### Connect to the nginx pod
+### Execute a simple shell on the nginx pod
 
 <details><summary>show</summary>
 <p>
@@ -321,6 +349,8 @@ kubectl get po # nowhere to be found :)
 kubectl run nginx --image=nginx --restart=Never --env=var1=val1
 # then
 kubectl exec -it nginx -- env
+# or
+kubectl exec -it nginx -- sh -c 'echo $var1'
 # or
 kubectl describe po nginx | grep val1
 # or

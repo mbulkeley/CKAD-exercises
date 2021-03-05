@@ -28,7 +28,7 @@ kubectl get ep # endpoints
 </p>
 </details>
 
-### Get pod's ClusterIP, create a temp busybox pod and 'hit' that IP with wget
+### Get service's ClusterIP, create a temp busybox pod and 'hit' that IP with wget
 
 <details><summary>show</summary>
 <p>
@@ -41,9 +41,19 @@ exit
 ```
 
 </p>
+or
+<p>
+
+```bash
+IP=$(kubectl get svc nginx --template={{.spec.clusterIP}}) # get the IP (something like 10.108.93.130)
+kubectl run busybox --rm --image=busybox -it --restart=Never --env="IP=$IP" -- wget -O- $IP:80 --timeout 2
+# Tip: --timeout is optional, but it helps to get answer more quickly when connection fails (in seconds vs minutes)
+```
+
+</p>
 </details>
 
-### Convert the ClusterIP to NodePort and find the NodePort port. Hit it using Node's IP. Delete the service and the pod
+### Convert the ClusterIP to NodePort for the same service and find the NodePort port. Hit service using Node's IP. Delete the service and the pod at the end.
 
 <details><summary>show</summary>
 <p>
@@ -92,6 +102,10 @@ wget -O- NODE_IP:31931 # if you're using Kubernetes with Docker for Windows/Mac,
 #if you're using minikube, try minikube ip, then get the node ip such as 192.168.99.117
 ```
 
+```bash
+kubectl delete svc nginx # Deletes the service
+kubectl delete pod nginx # Deletes the pod
+```
 </p>
 </details>
 
@@ -100,15 +114,13 @@ wget -O- NODE_IP:31931 # if you're using Kubernetes with Docker for Windows/Mac,
 <details><summary>show</summary>
 <p>
 
-
 ```bash
-kubectl run foo --image=dgkanatsios/simpleapp --labels=app=foo --port=8080 --replicas=3
+kubectl create deploy foo --image=dgkanatsios/simpleapp --port=8080 --replicas=3
 ```
-
 </p>
 </details>
 
-### Get the pod IPs. Create a temp busybox pod and trying hitting them on port 8080
+### Get the pod IPs. Create a temp busybox pod and try hitting them on port 8080
 
 <details><summary>show</summary>
 <p>
@@ -158,7 +170,7 @@ kubectl delete deploy foo
 </p>
 </details>
 
-### Create an nginx deployment of 2 replicas, expose it via a ClusterIP service on port 80. Create a NetworkPolicy so that only pods with labels 'access: true' can access the deployment and apply it
+### Create an nginx deployment of 2 replicas, expose it via a ClusterIP service on port 80. Create a NetworkPolicy so that only pods with labels 'access: granted' can access the deployment and apply it
 
 kubernetes.io > Documentation > Concepts > Services, Load Balancing, and Networking > [Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 
@@ -166,10 +178,12 @@ kubernetes.io > Documentation > Concepts > Services, Load Balancing, and Network
 <p>
 
 ```bash
-kubectl run nginx --image=nginx --replicas=2 --port=80 --expose
-kubectl describe svc nginx # see the 'run=nginx' selector for the pods
+kubectl create deployment nginx --image=nginx --replicas=2
+kubectl expose deployment nginx --port=80
+
+kubectl describe svc nginx # see the 'app=nginx' selector for the pods
 # or
-kubectl get svc nginx -o yaml --export
+kubectl get svc nginx -o yaml
 
 vi policy.yaml
 ```
@@ -182,12 +196,12 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      run: nginx # selector for the pods
+      app: nginx # selector for the pods
   ingress: # allow ingress traffic
   - from:
     - podSelector: # from pods
         matchLabels: # with this label
-          access: 'true' # 'true' *needs* quotes in YAML, apparently
+          access: granted
 ```
 
 ```bash
@@ -196,8 +210,8 @@ kubectl create -f policy.yaml
 
 # Check if the Network Policy has been created correctly
 # make sure that your cluster's network provider supports Network Policy (https://kubernetes.io/docs/tasks/administer-cluster/declare-network-policy/#before-you-begin)
-kubectl run busybox --image=busybox --rm -it --restart=Never -- wget -O- http://nginx:80                       # This should not work
-kubectl run busybox --image=busybox --rm -it --restart=Never --labels=access=true -- wget -O- http://nginx:80  # This should be fine
+kubectl run busybox --image=busybox --rm -it --restart=Never -- wget -O- http://nginx:80 --timeout 2                          # This should not work. --timeout is optional here. But it helps to get answer more quickly (in seconds vs minutes)
+kubectl run busybox --image=busybox --rm -it --restart=Never --labels=access=granted -- wget -O- http://nginx:80 --timeout 2  # This should be fine
 ```
 
 </p>

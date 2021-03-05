@@ -11,7 +11,7 @@ kubernetes.io > Documentation > Tasks > Configure Pods and Containers > [Configu
 <p>
 
 ```bash
-kubectl run nginx --image=nginx --restart=Never --dry-run -o yaml > pod.yaml
+kubectl run nginx --image=nginx --restart=Never --dry-run=client -o yaml > pod.yaml
 vi pod.yaml
 ```
 
@@ -47,7 +47,7 @@ kubectl delete -f pod.yaml
 </p>
 </details>
 
-### Modify the pod.yaml file so that liveness probe starts kicking in after 5 seconds whereas the period of probing would be 10 seconds. Run it, check the probe, delete it.
+### Modify the pod.yaml file so that liveness probe starts kicking in after 5 seconds whereas the interval between probes would be 5 seconds. Run it, check the probe, delete it.
 
 <details><summary>show</summary>
 <p>
@@ -72,7 +72,7 @@ spec:
     resources: {}
     livenessProbe: 
       initialDelaySeconds: 5 # add this line
-      periodSeconds: 10 # add this line as well
+      periodSeconds: 5 # add this line as well
       exec:
         command:
         - ls
@@ -96,7 +96,7 @@ kubectl delete -f pod.yaml
 <p>
 
 ```bash
-kubectl run nginx --image=nginx --dry-run -o yaml --restart=Never --port=80 > pod.yaml
+kubectl run nginx --image=nginx --dry-run=client -o yaml --restart=Never --port=80 > pod.yaml
 vi pod.yaml
 ```
 
@@ -115,7 +115,7 @@ spec:
     name: nginx
     resources: {}
     ports:
-      - containerPort: 80
+      - containerPort: 80 # Note: Readiness probes runs on the container during its whole lifecycle. Since nginx exposes 80, containerPort: 80 is not required for readiness to work.
     readinessProbe: # declare the readiness probe
       httpGet: # add this line
         path: / #
@@ -129,6 +129,30 @@ status: {}
 kubectl create -f pod.yaml
 kubectl describe pod nginx | grep -i readiness # to see the pod readiness details
 kubectl delete -f pod.yaml
+```
+
+</p>
+</details>
+
+### Lots of pods are running in `qa`,`alan`,`test`,`production` namespaces.  All of these pods are configured with liveness probe.  Please list all pods whose liveness probe are failed in the format of `<namespace>/<pod name>` per line.
+
+<details><summary>show</summary>
+<p>
+
+A typical liveness probe failure event
+```
+LAST SEEN   TYPE      REASON      OBJECT              MESSAGE
+22m         Warning   Unhealthy   pod/liveness-exec   Liveness probe failed: cat: can't open '/tmp/healthy': No such file or directory
+```
+
+collect failed pods namespace by namespace
+
+```sh  
+kubectl get ns # check namespaces
+kubectl -n qa get events | grep -i "Liveness probe failed"
+kubectl -n alan get events | grep -i "Liveness probe failed"
+kubectl -n test get events | grep -i "Liveness probe failed"
+kubectl -n production get events | grep -i "Liveness probe failed"
 ```
 
 </p>
@@ -183,6 +207,7 @@ kubectl delete po busybox --force --grace-period=0
 
 </p>
 </details>
+
 
 ### Get CPU/memory utilization for nodes ([metrics-server](https://github.com/kubernetes-incubator/metrics-server) must be running)
 

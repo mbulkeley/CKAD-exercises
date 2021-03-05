@@ -23,7 +23,7 @@ kubectl create configmap config --from-literal=foo=lala --from-literal=foo2=lolo
 <p>
 
 ```bash
-kubectl get cm config -o yaml --export
+kubectl get cm config -o yaml
 # or
 kubectl describe cm config
 ```
@@ -44,7 +44,7 @@ echo -e "foo3=lili\nfoo4=lele" > config.txt
 
 ```bash
 kubectl create cm configmap2 --from-file=config.txt
-kubectl get cm configmap2 -o yaml --export
+kubectl get cm configmap2 -o yaml
 ```
 
 </p>
@@ -63,7 +63,7 @@ echo -e "var1=val1\n# this is a comment\n\nvar2=val2\n#anothercomment" > config.
 
 ```bash
 kubectl create cm configmap3 --from-env-file=config.env
-kubectl get cm configmap3 -o yaml --export
+kubectl get cm configmap3 -o yaml
 ```
 
 </p>
@@ -83,7 +83,7 @@ echo -e "var3=val3\nvar4=val4" > config4.txt
 ```bash
 kubectl create cm configmap4 --from-file=special=config4.txt
 kubectl describe cm configmap4
-kubectl get cm configmap4 -o yaml --export
+kubectl get cm configmap4 -o yaml
 ```
 
 </p>
@@ -96,7 +96,7 @@ kubectl get cm configmap4 -o yaml --export
 
 ```bash
 kubectl create cm options --from-literal=var5=val5
-kubectl run nginx --image=nginx --restart=Never --dry-run -o yaml > pod.yaml
+kubectl run nginx --image=nginx --restart=Never --dry-run=client -o yaml > pod.yaml
 vi pod.yaml
 ```
 
@@ -140,7 +140,7 @@ kubectl exec -it nginx -- env | grep option # will show 'option=val5'
 
 ```bash
 kubectl create configmap anotherone --from-literal=var6=val6 --from-literal=var7=val7
-kubectl run --restart=Never nginx --image=nginx -o yaml --dry-run > pod.yaml
+kubectl run --restart=Never nginx --image=nginx -o yaml --dry-run=client > pod.yaml
 vi pod.yaml
 ```
 
@@ -181,7 +181,7 @@ kubectl exec -it nginx -- env
 
 ```bash
 kubectl create configmap cmvolume --from-literal=var8=val8 --from-literal=var9=val9
-kubectl run nginx --image=nginx --restart=Never -o yaml --dry-run > pod.yaml
+kubectl run nginx --image=nginx --restart=Never -o yaml --dry-run=client > pod.yaml
 vi pod.yaml
 ```
 
@@ -212,6 +212,7 @@ status: {}
 ```
 
 ```bash
+kubectl create -f pod.yaml
 kubectl exec -it nginx -- /bin/sh
 cd /etc/lala
 ls # will show var8 var9
@@ -225,13 +226,13 @@ cat var8 # will show val8
 
 kubernetes.io > Documentation > Tasks > Configure Pods and Containers > [Configure a Security Context for a Pod or Container](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)
 
-### Create the YAML for an nginx pod that runs with the UID 101. No need to create the pod
+### Create the YAML for an nginx pod that runs with the user ID 101. No need to create the pod
 
 <details><summary>show</summary>
 <p>
 
 ```bash
-kubectl run nginx --image=nginx --restart=Never --dry-run -o yaml > pod.yaml
+kubectl run nginx --image=nginx --restart=Never --dry-run=client -o yaml > pod.yaml
 vi pod.yaml
 ```
 
@@ -266,7 +267,7 @@ status: {}
 <p>
 
 ```bash
-kubectl run nginx --image=nginx --restart=Never --dry-run -o yaml > pod.yaml
+kubectl run nginx --image=nginx --restart=Never --dry-run=client -o yaml > pod.yaml
 vi pod.yaml
 ```
 
@@ -334,7 +335,7 @@ kubectl create secret generic mysecret --from-literal=password=mypass
 Create a file called username with the value admin:
 
 ```bash
-echo admin > username
+echo -n admin > username
 ```
 
 <details><summary>show</summary>
@@ -353,8 +354,8 @@ kubectl create secret generic mysecret2 --from-file=username
 <p>
 
 ```bash
-kubectl get secret mysecret2 -o yaml --export
-echo YWRtaW4K | base64 -d # shows 'admin'
+kubectl get secret mysecret2 -o yaml
+echo YWRtaW4K | base64 -d # on MAC it is -D, which decodes the value and shows 'admin'
 ```
 
 Alternative:
@@ -372,7 +373,7 @@ kubectl get secret mysecret2 -o jsonpath='{.data.username}{"\n"}' | base64 -d  #
 <p>
 
 ```bash
-kubectl run nginx --image=nginx --restart=Never -o yaml --dry-run > pod.yaml
+kubectl run nginx --image=nginx --restart=Never -o yaml --dry-run=client > pod.yaml
 vi pod.yaml
 ```
 
@@ -419,7 +420,7 @@ cat /etc/foo/username # shows admin
 
 ```bash
 kubectl delete po nginx
-kubectl run nginx --image=nginx --restart=Never -o yaml --dry-run > pod.yaml
+kubectl run nginx --image=nginx --restart=Never -o yaml --dry-run=client > pod.yaml
 vi pod.yaml
 ```
 
@@ -468,6 +469,11 @@ kubernetes.io > Documentation > Tasks > Configure Pods and Containers > [Configu
 ```bash
 kubectl get sa --all-namespaces
 ```
+Alternatively 
+
+```bash
+kubectl get sa -A
+```
 
 </p>
 </details>
@@ -485,7 +491,7 @@ Alternatively:
 
 ```bash
 # let's get a template easily
-kubectl get sa default -o yaml --export > sa.yaml
+kubectl get sa default -o yaml > sa.yaml
 vim sa.yaml
 ```
 
@@ -509,7 +515,14 @@ kubectl create -f sa.yaml
 <p>
 
 ```bash
-kubectl run nginx --image=nginx --restart=Never -o yaml --dry-run > pod.yaml
+kubectl run nginx --image=nginx --restart=Never --serviceaccount=myuser -o yaml --dry-run=client > pod.yaml
+kubectl apply -f pod.yaml
+```
+
+or you can add manually:
+
+```bash
+kubectl run nginx --image=nginx --restart=Never -o yaml --dry-run=client > pod.yaml
 vi pod.yaml
 ```
 
@@ -538,12 +551,6 @@ kubectl create -f pod.yaml
 kubectl describe pod nginx # will see that a new secret called myuser-token-***** has been mounted
 ```
 
-or you can add directly with kubectl run command:
-
-```bash
-kubectl run nginx --image=nginx --restart=Never --serviceaccount=myuser -o yaml --dry-run > pod.yaml
-kubectl apply -f pod.yaml
-```
 
 </p>
 </details>
